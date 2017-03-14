@@ -16,7 +16,7 @@ app.config(['$stateProvider', '$urlRouterProvider', function ($stateProvider, $u
             , controller: 'PostsCtrl',
                     resolve: {
                 post: ['$stateParams', 'postservice', function($stateParams, postservice) {
-                    console.log("adsawd");
+                    //console.log("adsawd");
                   return postservice.get($stateParams.id);
                 }]
               }
@@ -94,7 +94,7 @@ app.factory('postservice', ['$http', 'auth', function($http,auth) {
      o.getAll = function() {
     return $http.get('/posts').success(function(data){
       angular.copy(data, o.posts);
-        console.log(data);
+       // console.log(data);
     });
   };
     o.create = function(post) {
@@ -105,6 +105,11 @@ app.factory('postservice', ['$http', 'auth', function($http,auth) {
     o.upvote = function(post) {
   return $http.put('/posts/' + post._id + '/upvote', null, {headers: {Authorization: 'Bearer '+auth.getToken()}}).success(function(data){
       post.upvotes += 1;
+      //console.log(post._id);
+    });
+}; o.downvote = function(post) {
+  return $http.put('/posts/' + post._id + '/downvote', null, {headers: {Authorization: 'Bearer '+auth.getToken()}}).success(function(data){
+      post.upvotes -= 1;
     });
 };
     o.get = function(id) {
@@ -121,29 +126,65 @@ app.factory('postservice', ['$http', 'auth', function($http,auth) {
   }).success(function(data){
       comment.upvotes += 1;
     });
+};   o.downvoteComment = function(post, comment) {
+  return $http.put('/posts/' + post._id + '/comments/'+ comment._id + '/downvote', null, {
+    headers: {Authorization: 'Bearer '+auth.getToken()}
+  }).success(function(data){
+      comment.upvotes -= 1;
+    });
 };
     return o;
 }]);
 app.controller('MainCtrl', ['$scope', 'postservice','auth', function ($scope, postservice,auth) {
     $scope.isLoggedIn = auth.isLoggedIn;
-    $scope.posts = postservice.posts;
+    $scope.prePosts = postservice.posts;
+    $scope.postCheck=false;
+    $scope.postBtn=true;
+    var postArray=[];
+    angular.forEach($scope.prePosts ,function(val,key){
+        val.commentLength={};
+        val.commentLength=val.comments.length;
+        postArray.push(val);
+    });
+    $scope.posts = postArray;
+    $scope.postBox=function(){
+          $scope.postCheck=true;
+         $scope.postBtn=false;
+    }
  $scope.addPost = function(){
   if(!$scope.title || $scope.title === '') { return; }
+     if(($scope.link.indexOf('http://') || $scope.link.indexOf('https://')) >-1){
+         $scope.links=$scope.link;
+     }
+     else{
+          $scope.links="http://"+$scope.link;
+     }
   postservice.create({
     title: $scope.title,
-    link: $scope.link,
+    link: $scope.links,
   });
+     postservice.getAll();
+      $scope.postBtn=true;
+      $scope.postCheck=false;
   $scope.title = '';
   $scope.link = '';
 };
       $scope.incrementUpvotes = function(post) {
   postservice.upvote(post);
+};   $scope.decrementUpvotes = function(post) {
+  postservice.downvote(post);
 };
 }]);
 app.controller('PostsCtrl', ['$scope', '$stateParams', 'postservice','post','auth', function ($scope, $stateParams, postservice,post,auth) {
     
     $scope.post = post;
+    $scope.commentCheck=false;
+    $scope.commentBtn=true;
     $scope.isLoggedIn = auth.isLoggedIn;
+    $scope.commentBox=function(){
+          $scope.commentCheck=true;
+         $scope.commentBtn=false;
+    }
         $scope.addComment = function(){
           if($scope.body === '') { return; }
           postservice.addComment(post._id, {
@@ -151,12 +192,17 @@ app.controller('PostsCtrl', ['$scope', '$stateParams', 'postservice','post','aut
             author: 'user',
           }).success(function(comment) {
             $scope.post.comments.push(comment);
+              $scope.commentBtn=true;
+              $scope.commentCheck=false;
           });
           $scope.body = '';
         };
     
     $scope.incrementUpvotes = function(comment){
   postservice.upvoteComment(post, comment);
+}; 
+    $scope.decrementUpvotes = function(comment){
+  postservice.downvoteComment(post, comment);
 };
     
 }]);
